@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = read_text
+build_property.ProjectDir = d:\Code\AI\AI-102-AIEngineer-Course\20-ocr\C-Sharp\read-text\
