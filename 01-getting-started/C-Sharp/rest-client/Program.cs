@@ -77,7 +77,6 @@ namespace rest_client
 
                 // Use the endpoint to access the Text Analytics language API
                 var uri = cogSvcEndpoint + "text/analytics/v3.1/languages?" + queryString;
-
                 // Send the request and get the response
                 HttpResponseMessage response;
                 using (var content = new ByteArrayContent(encodedBytes))
