@@ -20,7 +20,9 @@ namespace translate_text
             try
             {
                 // Get config settings from AppSettings
-                IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
+                IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile(
+                    "appsettings.json"
+                );
                 IConfigurationRoot configuration = builder.Build();
                 cogSvcKey = configuration["CognitiveServiceKey"];
                 cogSvcRegion = configuration["CognitiveServiceRegion"];
@@ -30,7 +32,7 @@ namespace translate_text
                 Console.OutputEncoding = Encoding.Unicode;
 
                 // Analyze each text file in the reviews folder
-                var folderPath = Path.GetFullPath("./reviews");  
+                var folderPath = Path.GetFullPath("./reviews");
                 DirectoryInfo folder = new DirectoryInfo(folderPath);
                 foreach (var file in folder.GetFiles("*.txt"))
                 {
@@ -48,11 +50,10 @@ namespace translate_text
                     // Translate if not already English
                     if (language != "en")
                     {
-                        string translatedText = await Translate(text,language);
+                        string translatedText = await Translate(text, language);
                         Console.WriteLine("\nTranslation:\n" + translatedText);
                     }
                 }
-
             }
             catch (Exception ex)
             {
@@ -66,8 +67,33 @@ namespace translate_text
             string language = "en";
 
             // Use the Translator detect function
+            var body = new object[] { new { Text = text } };
+            var requestBody = JsonConvert.SerializeObject(body);
+            using (var client = new HttpClient())
+            {
+                using (var request = new HttpRequestMessage())
+                {
+                    //Build the request
+                    var path = "/detect?api-version=3.0";
+                    request.Method = HttpMethod.Post;
+                    request.RequestUri = new Uri(translatorEndpoint + path);
+                    request.Content = new StringContent(
+                        requestBody,
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+                    request.Headers.Add("Ocp-Apim-Subscription-Key", cogSvcKey);
+                    request.Headers.Add("Ocp-Apim-Subscription-Region", cogSvcRegion);
 
+                    //Send the request
+                    var response = await client.SendAsync(request).ConfigureAwait(false);
 
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    JArray jsonResponse = JArray.Parse(responseContent);
+                    language = (string)jsonResponse[0]["language"];
+                }
+            }
             // return the language
             return language;
         }
@@ -77,12 +103,36 @@ namespace translate_text
             string translation = "";
 
             // Use the Translator translate function
+            var body = new object[] { new { Text = text } };
+            var requestBody = JsonConvert.SerializeObject(body);
+            using (var client = new HttpClient())
+            {
+                using (var request = new HttpRequestMessage())
+                {
+                    //Build the request
+                    var path = $"/translate?api-version=3.0&from={sourceLanguage}&to=en";
+                    request.Method = HttpMethod.Post;
+                    request.RequestUri = new Uri(translatorEndpoint + path);
+                    request.Content = new StringContent(
+                        requestBody,
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+                    request.Headers.Add("Ocp-Apim-Subscription-Key", cogSvcKey);
+                    request.Headers.Add("Ocp-Apim-Subscription-Region", cogSvcRegion);
 
+                    //Send the request
+                    var response = await client.SendAsync(request).ConfigureAwait(false);
+
+                    var responseContent = await response.Content.ReadAsStringAsync();
+
+                    JArray jsonResponse = JArray.Parse(responseContent);
+                    translation = (string)jsonResponse[0]["translations"][0]["text"];
+                }
+            }
 
             // Return the translation
             return translation;
-
         }
     }
 }
-
