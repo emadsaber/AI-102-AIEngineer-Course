@@ -7,6 +7,10 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
+using Azure;
+using Azure.AI.Language.Conversations;
+using Azure.Core;
+using System.Text.Json;
 
 // Import namespaces
 
@@ -15,20 +19,28 @@ namespace clock_client
 {
     class Program
     {
-
         static async Task Main(string[] args)
         {
             try
             {
                 // Get config settings from AppSettings
-                IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
+                IConfigurationBuilder builder = new ConfigurationBuilder().AddJsonFile(
+                    "appsettings.json"
+                );
                 IConfigurationRoot configuration = builder.Build();
-                Guid luAppId = Guid.Parse(configuration["LuAppID"]);
-                string predictionEndpoint = configuration["LuPredictionEndpoint"];
-                string predictionKey = configuration["LuPredictionKey"];
+                string cogSvcKey = configuration["SubscriptionKey"];
+                string endpointUrl = configuration["EndpointUrl"];
+                string predictionProjectName = configuration["PredictionProjectName"];
+                string predictionDeploymentName = configuration["PredictionDeploymentName"];
 
                 // Create a client for the LU app
-                
+                Uri endpoint = new Uri(endpointUrl);
+                AzureKeyCredential credential = new AzureKeyCredential(cogSvcKey);
+
+                ConversationAnalysisClient client = new ConversationAnalysisClient(
+                    endpoint,
+                    credential
+                );
 
                 // Get user input (until they enter "quit")
                 string userText = "";
@@ -38,17 +50,114 @@ namespace clock_client
                     userText = Console.ReadLine();
                     if (userText.ToLower() != "quit")
                     {
-
                         // Call the LU app to get intent and entities
+                        var data = new
+                        {
+                            kind = "Conversation",
+                            analysisInput = new
+                            {
+                                conversationItem = new
+                                {
+                                    text = userText,
+                                    id = "1",
+                                    participantId = "1",
+                                }
+                            },
+                            parameters = new
+                            {
+                                projectName = predictionProjectName,
+                                deploymentName = predictionDeploymentName,
+                                // Use Utf16CodeUnit for strings in .NET.
+                                stringIndexType = "Utf16CodeUnit",
+                            },
+                        };
+                        try
+                        {
+                            //Console.WriteLine(JsonConvert.SerializeObject(data));
 
+                            Response response = client.AnalyzeConversation(
+                                RequestContent.Create(data)
+                            );
 
-                        // Apply the appropriate action
-                        
+                            using JsonDocument result = JsonDocument.Parse(response.ContentStream);
+                            JsonElement conversationalTaskResult = result.RootElement;
+                            JsonElement conversationPrediction = conversationalTaskResult
+                                .GetProperty("result")
+                                .GetProperty("prediction");
 
+                            var topIntent = conversationPrediction
+                                .GetProperty("topIntent")
+                                .GetString();
+                            Console.WriteLine($"Top intent: {topIntent}");
+
+                            // Apply the appropriate action
+                            switch (topIntent)
+                            {
+                                case "GetTime":
+                                    //Get top entity
+                                    var location = "local";
+                                    foreach (
+                                        JsonElement entity in conversationPrediction
+                                            .GetProperty("entities")
+                                            .EnumerateArray()
+                                    )
+                                    {
+                                        var category = entity.GetProperty("category").GetString();
+                                        if (category == "Location")
+                                        {
+                                            location = entity.GetProperty("text").GetString(); //get the city name
+                                        }
+                                    }
+
+                                    Console.WriteLine(GetTime(location));
+
+                                    break;
+                                case "GetDay":
+                                    var date = DateTime.Today.ToShortDateString();
+                                    foreach (
+                                        JsonElement entity in conversationPrediction
+                                            .GetProperty("entities")
+                                            .EnumerateArray()
+                                    )
+                                    {
+                                        var category = entity.GetProperty("category").GetString();
+                                        if (category == "Date")
+                                        {
+                                            date = entity.GetProperty("text").GetString(); //get the city name
+                                        }
+                                    }
+
+                                    Console.WriteLine(GetDay(date));
+
+                                    break;
+                                case "GetDate":
+                                    var day = DateTime.Today.DayOfWeek.ToString();
+                                    foreach (
+                                        JsonElement entity in conversationPrediction
+                                            .GetProperty("entities")
+                                            .EnumerateArray()
+                                    )
+                                    {
+                                        var category = entity.GetProperty("category").GetString();
+                                        if (category == "Weekday")
+                                        {
+                                            day = entity.GetProperty("text").GetString(); //get the city name
+                                        }
+                                    }
+
+                                    Console.WriteLine(GetDate(day));
+                                    break;
+                                default:
+                                    Console.WriteLine("Try another text related to time");
+                                    break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex.ToString());
+                        }
                     }
-
                 }
-
             }
             catch (Exception ex)
             {
@@ -99,7 +208,7 @@ namespace clock_client
                     timeString = "I don't know what time it is in " + location;
                     break;
             }
-            
+
             return timeString;
         }
 
@@ -117,21 +226,19 @@ namespace clock_client
                 date_string = DateTime.Today.AddDays(offset).ToShortDateString();
             }
             return date_string;
-
         }
-        
+
         static string GetDay(string date)
         {
             // Note: To keep things simple, dates must be entered in US format (MM/DD/YYYY)
-             string day_string = "Enter a date in MM/DD/YYYY format.";
-             DateTime dateTime;
-             if (DateTime.TryParse(date, out dateTime))
-             {
-                  day_string = dateTime.DayOfWeek.ToString();
-             }
+            string day_string = "Enter a date in MM/DD/YYYY format.";
+            DateTime dateTime;
+            if (DateTime.TryParse(date, out dateTime))
+            {
+                day_string = dateTime.DayOfWeek.ToString();
+            }
 
-             return day_string;
+            return day_string;
         }
     }
 }
-
