@@ -1,7 +1,7 @@
 {
-    "name": "margies-indexer",
+    "name": "mergies-indexer",
     "description": "Indexer for Margies Travel",
-    "dataSourceName": "margies-data",
+    "dataSourceName": "margies-source",
     "skillsetName": "margies-skillset",
     "targetIndexName": "margies-index",
     "parameters": {

@@ -4,7 +4,7 @@
     "cognitiveServices": {
         "@odata.type": "#Microsoft.Azure.Search.CognitiveServicesByKey",
         "description": "cognitive services",
-        "key": "YOUR_COGNITIVE_SERVICES_KEY"
+        "key": "29f1a1d780bc46d98467f3ad1e0052e4"
       },
     "skills": [
       {
